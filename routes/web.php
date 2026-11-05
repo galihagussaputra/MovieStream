@@ -8,12 +8,13 @@ use App\Http\Controllers\Admin\MovieController;
 use App\Http\Controllers\Admin\SeasonController;
 use App\Http\Controllers\Admin\TagController;
 use App\Http\Controllers\Admin\TvShowController;
-use App\Http\Controllers\Frontend\WelcomeController;
 use App\Http\Controllers\Frontend\CastController as FrontendCastController;
+use App\Http\Controllers\Frontend\ExploreController;
 use App\Http\Controllers\Frontend\GenreController as FrontendGenreController;
 use App\Http\Controllers\Frontend\MovieController as FrontendMovieController;
 use App\Http\Controllers\Frontend\TagController as FrontendTagController;
 use App\Http\Controllers\Frontend\TvShowController as FrontendTvShowController;
+use App\Http\Controllers\Frontend\WelcomeController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -39,6 +40,10 @@ use Inertia\Inertia;
 // });
 
 Route::get('/', [WelcomeController::class, 'index']);
+Route::get('/explore', [ExploreController::class, 'index'])->name('explore.index');
+Route::get('/explore/movies/{id}', [ExploreController::class, 'movie'])->name('explore.movie');
+Route::get('/explore/tv/{id}', [ExploreController::class, 'tv'])->name('explore.tv');
+
 Route::get('/movies', [FrontendMovieController::class, 'index'])->name('movies.index');
 Route::get('/movies/{movie:slug}', [FrontendMovieController::class, 'show'])->name('movies.show');
 Route::get('/tv-shows', [FrontendTvShowController::class, 'index'])->name('tvShows.index');

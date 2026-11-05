@@ -2,11 +2,14 @@
 import { Head, Link } from "@inertiajs/vue3";
 import FrontLayout from "@/Layouts/FrontLayout.vue";
 import MovieCard from "@/Matrials/MovieCard.vue";
+import TmdbCard from "@/Matrials/TmdbCard.vue";
 
 defineProps({
     movies: Array,
     tvShows: Array,
     episodes: Array,
+    trending: Array,
+    tmdbConfigured: Boolean,
 });
 </script>
 
@@ -14,6 +17,31 @@ defineProps({
     <Head title="Welcome" />
     <FrontLayout>
         <main class="max-w-6xl mx-auto mt-6 min-h-screen">
+            <section
+                v-if="trending && trending.length"
+                class="bg-gray-200 dark:bg-gray-900 dark:text-white mt-4 p-2 rounded"
+            >
+                <div class="flex items-center justify-between m-2 p-2">
+                    <h1 class="text-2xl font-bold text-indigo-600 dark:text-indigo-300">
+                        Trending di TMDB
+                    </h1>
+                    <a
+                        href="/explore"
+                        class="text-sm font-semibold text-indigo-600 hover:text-indigo-800 dark:text-indigo-300"
+                    >
+                        Lihat semua
+                    </a>
+                </div>
+                <div
+                    class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 rounded"
+                >
+                    <TmdbCard
+                        v-for="item in trending"
+                        :key="`${item.media_type}-${item.id}`"
+                        :item="item"
+                    />
+                </div>
+            </section>
             <section
                 class="bg-gray-200 dark:bg-gray-900 dark:text-white mt-4 p-2 rounded"
             >
