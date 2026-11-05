@@ -1,6 +1,6 @@
 # MovieStream
 
-MovieStream adalah aplikasi katalog film dan serial TV berbasis web. Aplikasi ini menyediakan halaman publik untuk menjelajahi konten, serta panel admin untuk mengimpor metadata dari TMDB dan mengelola trailer, tautan unduhan, pemeran, genre, dan tag.
+MovieStream adalah aplikasi katalog film dan serial TV berbasis web. Aplikasi ini menyediakan halaman publik untuk menjelajahi konten, halaman **Explore** yang mengambil data langsung (realtime) dari TMDB, serta panel admin untuk mengimpor metadata dari TMDB dan mengelola trailer, tautan unduhan, pemeran, genre, dan tag.
 
 Dibangun dengan **Laravel 10**, **Inertia.js**, **Vue 3**, **Tailwind CSS**, dan **MySQL 8**.
 
@@ -11,6 +11,7 @@ Dibangun dengan **Laravel 10**, **Inertia.js**, **Vue 3**, **Tailwind CSS**, dan
 - [Stack Teknologi](#stack-teknologi)
 - [Menjalankan Aplikasi](#menjalankan-aplikasi)
 - [Konfigurasi Environment](#konfigurasi-environment)
+- [Integrasi TMDB (Realtime)](#integrasi-tmdb-realtime)
 - [Pengujian](#pengujian)
 - [Struktur Proyek](#struktur-proyek)
 - [Keamanan](#keamanan)
@@ -21,7 +22,9 @@ Dibangun dengan **Laravel 10**, **Inertia.js**, **Vue 3**, **Tailwind CSS**, dan
 - Katalog film dan serial TV dengan pencarian, pagination, dan pengurutan.
 - Halaman detail film, serial TV, musim, episode, pemeran, genre, dan tag.
 - Panel admin dengan autentikasi dan otorisasi role `admin`.
-- Impor metadata film, serial TV, musim, episode, pemeran, dan genre dari TMDB.
+- Impor metadata film, serial TV, musim, episode, pemeran, dan genre dari TMDB ke database lokal.
+- Halaman Explore realtime dari TMDB: trending, film populer, serial TV populer, pencarian, detail, trailer, pemeran, dan rekomendasi.
+- Cache respons TMDB untuk mengurangi jumlah request dan mempercepat halaman.
 - Pengelolaan trailer, tautan unduhan, pemeran, genre, dan tag per film.
 - Validasi server-side untuk seluruh input admin.
 - Penghapusan berantai untuk data terkait (season, episode, lampiran, dan pivot).
@@ -30,7 +33,6 @@ Dibangun dengan **Laravel 10**, **Inertia.js**, **Vue 3**, **Tailwind CSS**, dan
 
 ## Tangkapan Layar
 
-> Tangkapan layar menggunakan data demo. Tampilan aktual bergantung pada isi database.
 
 ### Halaman Publik
 
@@ -69,7 +71,7 @@ Dibangun dengan **Laravel 10**, **Inertia.js**, **Vue 3**, **Tailwind CSS**, dan
 
 - [Docker](https://docs.docker.com/get-docker/) dan Docker Compose.
 - Koneksi internet untuk instalasi dependency dan pengambilan gambar dari TMDB.
-- API Key TMDB apabila ingin menggunakan fitur impor konten.
+- TMDB API Read Access Token (v4, disarankan) atau API Key (v3) untuk fitur impor dan Explore realtime.
 
 #### Langkah Menjalankan
 
@@ -86,14 +88,18 @@ Dibangun dengan **Laravel 10**, **Inertia.js**, **Vue 3**, **Tailwind CSS**, dan
    cp .env.example .env
    ```
 
-3. Isi API Key TMDB pada `.env` (opsional, tetapi diperlukan untuk impor konten).
+3. Isi kredensial TMDB pada `.env`. Disarankan memakai **API Read Access Token (v4)** agar autentikasi dikirim melalui header `Authorization: Bearer`.
 
    ```dotenv
-   TMDB_SECRET=api_key_tmdb_anda
+   TMDB_TOKEN=api_read_access_token_v4_anda
+   TMDB_SECRET=
    TMDB_ENDPOINT=https://api.themoviedb.org/3/
+   TMDB_IMAGE_URL=https://image.tmdb.org/t/p/
+   TMDB_LANGUAGE=en-US
+   TMDB_CACHE_TTL=600
    ```
 
-   API Key dapat dibuat melalui [pengaturan API TMDB](https://www.themoviedb.org/settings/api).
+   `TMDB_SECRET` (API Key v3) tetap didukung sebagai fallback jika `TMDB_TOKEN` kosong. Kredensial dapat dibuat melalui [pengaturan API TMDB](https://www.themoviedb.org/settings/api).
 
 4. Jalankan seluruh service.
 
@@ -140,6 +146,41 @@ Dibangun dengan **Laravel 10**, **Inertia.js**, **Vue 3**, **Tailwind CSS**, dan
 
 > **Catatan:** `docker compose down -v` akan menghapus data MySQL yang tersimpan di volume Docker.
 
+#### Troubleshooting Vite di Windows/WSL
+
+Jika browser Windows menampilkan error seperti:
+
+```text
+GET http://0.0.0.0:5173/@vite/client net::ERR_ADDRESS_INVALID
+```
+
+penyebabnya adalah Vite mengiklankan alamat bind `0.0.0.0` ke browser. Konfigurasi proyek sekarang memisahkan alamat bind dan alamat HMR:
+
+- Container tetap listen pada `0.0.0.0:5173` agar port Docker bisa diakses.
+- Browser diarahkan ke `VITE_HMR_HOST` (default `localhost`).
+
+Langkah perbaikan:
+
+1. Pastikan port `5173` dipetakan ke host dan dapat diakses dari Windows.
+2. Jika aplikasi diakses lewat `http://localhost:8000`, biarkan `VITE_HMR_HOST=localhost`.
+3. Jika aplikasi diakses lewat IP WSL (misalnya `http://172.x.x.x:8000`), set `VITE_HMR_HOST` ke IP WSL tersebut pada `.env`.
+4. Recreate container Vite agar file `public/hot` diperbarui.
+
+   ```bash
+   docker compose up -d --force-recreate vite
+   cat public/hot
+   ```
+
+   Isi `public/hot` harus berupa URL yang bisa dibuka browser, misalnya `http://localhost:5173`, bukan `http://0.0.0.0:5173`.
+
+5. Jika masih bermasalah, restart kedua service.
+
+   ```bash
+   docker compose restart vite app
+   ```
+
+
+
 ### Opsi 2: Menjalankan Tanpa Docker
 
 #### Prasyarat
@@ -174,8 +215,12 @@ Dibangun dengan **Laravel 10**, **Inertia.js**, **Vue 3**, **Tailwind CSS**, dan
    DB_USERNAME=root
    DB_PASSWORD=
 
-   TMDB_SECRET=api_key_tmdb_anda
+   TMDB_TOKEN=api_read_access_token_v4_anda
+   TMDB_SECRET=
    TMDB_ENDPOINT=https://api.themoviedb.org/3/
+   TMDB_IMAGE_URL=https://image.tmdb.org/t/p/
+   TMDB_LANGUAGE=en-US
+   TMDB_CACHE_TTL=600
    ```
 
 4. Buat database `stream_app`, lalu jalankan migrasi.
@@ -213,10 +258,47 @@ Variabel penting yang perlu diperhatikan:
 | `DB_DATABASE` | Ya | Nama database, default `stream_app`. |
 | `DB_USERNAME` | Ya | Username database. |
 | `DB_PASSWORD` | Ya | Password database. |
-| `TMDB_SECRET` | Untuk impor | API Key TMDB v3. |
+| `TMDB_TOKEN` | Disarankan | API Read Access Token TMDB v4. Dipakai sebagai Bearer token dan menjadi prioritas utama. |
+| `TMDB_SECRET` | Fallback | API Key TMDB v3. Dipakai jika `TMDB_TOKEN` kosong. |
 | `TMDB_ENDPOINT` | Tidak | Endpoint TMDB, default `https://api.themoviedb.org/3/`. |
+| `TMDB_IMAGE_URL` | Tidak | Basis URL gambar TMDB, default `https://image.tmdb.org/t/p/`. |
+| `TMDB_LANGUAGE` | Tidak | Bahasa metadata, default `en-US`. |
+| `TMDB_CACHE_TTL` | Tidak | Lama cache respons TMDB dalam detik, default `600`. Isi `0` untuk menonaktifkan cache. |
+| `VITE_PORT` | Tidak | Port host untuk Vite dev server, default `5173`. |
+| `VITE_HMR_HOST` | Tidak | Host yang dipakai browser untuk koneksi HMR Vite, default `localhost`. Ubah ke IP WSL/host jika browser Windows mengakses aplikasi lewat IP tersebut. |
 
 File `.env` tidak boleh di-commit. Gunakan `.env.example` sebagai referensi konfigurasi.
+
+## Integrasi TMDB (Realtime)
+
+Aplikasi memakai dua jalur pengambilan data TMDB:
+
+| Kebutuhan | Sumber data | Penyimpanan |
+| --- | --- | --- |
+| Impor film, serial TV, musim, episode, pemeran, dan genre dari panel admin | TMDB API realtime | Disimpan ke database lokal |
+| Halaman Explore, pencarian live, dan bagian Trending di beranda | TMDB API realtime | Hanya cache sementara, tidak disimpan ke database |
+
+### Autentikasi
+
+- Jika `TMDB_TOKEN` diisi, aplikasi mengirim request dengan header `Authorization: Bearer <token>` (API Read Access Token v4).
+- Jika `TMDB_TOKEN` kosong, aplikasi memakai `TMDB_SECRET` sebagai query parameter `api_key` (API Key v3).
+- Jika keduanya kosong, halaman Explore menampilkan peringatan dan pencarian live dinonaktifkan; katalog lokal tetap berjalan.
+
+### Cache
+
+Respons TMDB di-cache menggunakan driver cache Laravel (`CACHE_DRIVER`, default `file`) selama `TMDB_CACHE_TTL` detik. Untuk membersihkan cache setelah mengganti token atau saat data terasa tidak diperbarui:
+
+```bash
+docker compose exec app php artisan cache:clear
+```
+
+Untuk memaksa pengambilan data terbaru tanpa cache sementara, set `TMDB_CACHE_TTL=0` lalu restart container aplikasi.
+
+### Halaman terkait
+
+- `/explore` — trending, film populer, serial TV populer, dan pencarian live.
+- `/explore/movies/{id}` — detail film realtime dari TMDB.
+- `/explore/tv/{id}` — detail serial TV realtime dari TMDB.
 
 ## Pengujian
 
@@ -243,6 +325,7 @@ app/
   Http/Controllers/Admin/       # Controller panel admin
   Http/Controllers/Frontend/    # Controller halaman publik
   Models/                       # Model Eloquent
+  Services/TmdbService.php      # Klien TMDB (v4 token / v3 key, cache)
 database/
   migrations/                   # Skema database
   seeders/                      # Seeder data
@@ -250,6 +333,7 @@ docs/
   screenshots/                  # Gambar dokumentasi
 resources/
   js/Pages/                     # Halaman Inertia + Vue
+  js/Pages/Frontend/Explore/    # Halaman Explore realtime TMDB
   js/Layouts/                   # Layout publik dan admin
 routes/
   web.php                       # Route publik dan admin
@@ -262,8 +346,9 @@ docker-compose.yml              # Konfigurasi service Docker
 
 ## Keamanan
 
-- Jangan pernah meng-commit file `.env` atau API Key TMDB.
-- Gunakan API Key khusus untuk pengembangan dan rotasi key jika pernah terekspos.
+- Jangan pernah meng-commit file `.env`, `TMDB_TOKEN`, atau `TMDB_SECRET`.
+- Gunakan kredensial khusus untuk pengembangan dan rotasi token/key jika pernah terekspos.
+- `TMDB_TOKEN` dikirim melalui header Bearer sehingga tidak muncul di URL/log akses, berbeda dengan `TMDB_SECRET` v3 yang dikirim sebagai query parameter.
 - Panel admin dilindungi oleh middleware `auth`, `verified`, dan role `admin`.
 - Input admin divalidasi di sisi server sebelum disimpan.
 - Gunakan HTTPS dan konfigurasi database yang kuat saat deployment produksi.
