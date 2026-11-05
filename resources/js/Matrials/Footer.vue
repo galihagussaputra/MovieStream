@@ -25,8 +25,8 @@
             mt-4
           ">
         © Movie Stream —
-        <a href="https://github.com/galih17421010" class="text-gray-600 dark:text-gray-100 ml-1" rel="noopener noreferrer"
-          target="_blank">@galih17421010</a>
+        <a href="https://github.com/galihagussaputra" class="text-gray-600 dark:text-gray-100 ml-1" rel="noopener noreferrer"
+          target="_blank">@galihagussaputra</a>
       </p>
       <span class="
             inline-flex
