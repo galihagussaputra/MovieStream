@@ -74,8 +74,8 @@ Route::middleware(['auth:sanctum', 'verified', 'role:admin'])->prefix('admin')->
     Route::delete('/trailer-urls/{trailer_url}', [MovieAttachController::class, 'destroyTrailer'])->name('trailers.destroy');
     Route::delete('/downloads/{download}', [MovieAttachController::class, 'destroyDownload'])->name('downloads.destroy');
     Route::resource('/tv-shows', TvShowController::class);
-    Route::resource('/tv-shows/{tv_show}/seasons', SeasonController::class);
-    Route::resource('/tv-shows/{tv_show}/seasons/{season}/episodes', EpisodeController::class);
+    Route::resource('/tv-shows/{tv_show}/seasons', SeasonController::class)->scoped();
+    Route::resource('/tv-shows/{tv_show}/seasons/{season}/episodes', EpisodeController::class)->scoped();
     Route::resource('/genres', GenreController::class);
     Route::resource('/casts', CastController::class);
     Route::resource('/tags', TagController::class);
