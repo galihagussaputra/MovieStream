@@ -11,6 +11,12 @@ class Tag extends Model
 
     protected $fillable = ['tag_name', 'slug'];
 
+    protected static function booted(): void
+    {
+        static::deleting(function (Tag $tag) {
+            $tag->movies()->detach();
+        });
+    }
 
     public function movies()
     {

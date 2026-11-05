@@ -27,6 +27,17 @@ class Movie extends Model implements Searchable
         'slug'
     ];
 
+    protected static function booted(): void
+    {
+        static::deleting(function (Movie $movie) {
+            $movie->genres()->detach();
+            $movie->casts()->detach();
+            $movie->tags()->detach();
+            $movie->trailers()->delete();
+            $movie->downloads()->delete();
+        });
+    }
+
     public function getSearchResult(): SearchResult
     {
         $url = route('movies.show', $this->slug);

@@ -12,6 +12,13 @@ class Season extends Model
     use HasFactory;
     protected $fillable = ['tmdb_id', 'name', 'slug', 'poster_path', 'tv_show_id', 'season_number'];
 
+    protected static function booted(): void
+    {
+        static::deleting(function (Season $season) {
+            $season->episodes()->get()->each->delete();
+        });
+    }
+
     public function setNameAttribute($value)
     {
         $this->attributes['name'] = $value;

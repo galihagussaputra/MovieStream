@@ -12,6 +12,13 @@ class Cast extends Model
 
     protected $fillable = ['tmdb_id', 'name', 'slug', 'poster_path'];
 
+    protected static function booted(): void
+    {
+        static::deleting(function (Cast $cast) {
+            $cast->movies()->detach();
+        });
+    }
+
     public function setNameAttribute($value)
     {
         $this->attributes['name'] = $value;

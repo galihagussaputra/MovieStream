@@ -13,6 +13,13 @@ class Genre extends Model
 
     protected $fillable = ['tmdb_id', 'title', 'slug'];
 
+    protected static function booted(): void
+    {
+        static::deleting(function (Genre $genre) {
+            $genre->movies()->detach();
+        });
+    }
+
     public function setTitleAttribute($value)
     {
         $this->attributes['title'] = $value;

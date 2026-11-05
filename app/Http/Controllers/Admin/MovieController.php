@@ -90,7 +90,6 @@ class MovieController extends Controller
 
     public function destroy(Movie $movie)
     {
-        $movie->genres()->sync([]);
         $movie->delete();
         return Redirect::route('admin.movies.index')->with('flash.banner', 'Movie Deleted.')->with('flash.bannerStyle', 'danger');
     }

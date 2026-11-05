@@ -14,9 +14,16 @@ class TvShow extends Model implements Searchable
 
     protected $fillable = ['tmdb_id', 'name', 'slug', 'poster_path', 'created_year'];
 
+    protected static function booted(): void
+    {
+        static::deleting(function (TvShow $tvShow) {
+            $tvShow->seasons()->get()->each->delete();
+        });
+    }
+
     public function getSearchResult(): SearchResult
     {
-        $url = route('series.show', $this->slug);
+        $url = route('tvShows.show', $this->slug);
 
         return new \Spatie\Searchable\SearchResult(
             $this,
