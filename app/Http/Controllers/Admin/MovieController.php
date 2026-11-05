@@ -6,7 +6,7 @@ use App\Http\Controllers\Admin\Concerns\HandlesAdminIndex;
 use App\Http\Controllers\Controller;
 use App\Models\Genre;
 use App\Models\Movie;
-use Illuminate\Support\Facades\Http;
+use App\Services\TmdbService;
 use Illuminate\Support\Facades\Redirect;
 use Illuminate\Support\Facades\Request;
 use Inertia\Inertia;
@@ -29,8 +29,8 @@ class MovieController extends Controller
                     $query->orderBy($column, $direction);
                 })
                 ->paginate($perPage),
-                // ->withQueryString(),
-            'filters' => Request::only(['search', 'perPage', 'column', 'direction'])
+            // ->withQueryString(),
+            'filters' => Request::only(['search', 'perPage', 'column', 'direction']),
         ]);
     }
 
@@ -46,29 +46,35 @@ class MovieController extends Controller
             return Redirect::back()->with('flash.banner', 'Movie Exists.');
         }
 
-        $apiMovie = Http::asJson()->get(config('services.tmdb.endpoint').'movie/'. $movieTMDBId . '?api_key=' . config('services.tmdb.secret') . '&language=en-US');
+        $apiMovie = app(TmdbService::class)->movie($movieTMDBId);
 
-        if ($apiMovie->successful()) {
+        if ($apiMovie) {
 
             $created_movie = Movie::create([
                 'tmdb_id' => $apiMovie['id'],
                 'title' => $apiMovie['title'],
-                'runtime' => $apiMovie['runtime'],
-                'rating' => $apiMovie['vote_average'],
-                'release_date' => $apiMovie['release_date'],
-                'lang' => $apiMovie['original_language'],
+                'runtime' => $apiMovie['runtime'] ?? 0,
+                'rating' => $apiMovie['vote_average'] ?? 0,
+                'release_date' => $apiMovie['release_date'] ?? null,
+                'lang' => $apiMovie['original_language'] ?? null,
                 'video_format' => 'HD',
                 'is_public' => false,
-                'overview' => $apiMovie['overview'],
-                'poster_path' => $apiMovie['poster_path'],
-                'backdrop_path' => $apiMovie['backdrop_path']
+                'overview' => $apiMovie['overview'] ?? '',
+                'poster_path' => $apiMovie['poster_path'] ?? null,
+                'backdrop_path' => $apiMovie['backdrop_path'] ?? null,
             ]);
-            $tmdb_genres = $apiMovie['genres'];
-            $tmdb_genres_ids = collect($tmdb_genres)->pluck('id');
-            $genres = Genre::whereIn('tmdb_id', $tmdb_genres_ids)->get();
-            $created_movie->genres()->attach($genres);
+
+            $genres = collect($apiMovie['genres'] ?? [])->map(function (array $tmdbGenre) {
+                return Genre::firstOrCreate(
+                    ['tmdb_id' => $tmdbGenre['id']],
+                    ['title' => $tmdbGenre['name']]
+                );
+            });
+
+            $created_movie->genres()->attach($genres->pluck('id'));
+
             return Redirect::back()->with('flash.banner', 'Movie create.');
-    
+
         } else {
             return Redirect::back()->with('flash.banner', 'Api Error.');
 
@@ -77,7 +83,7 @@ class MovieController extends Controller
 
     public function edit(Movie $movie)
     {
-       return Inertia::render('Movies/Edit', ['movie' => $movie]);
+        return Inertia::render('Movies/Edit', ['movie' => $movie]);
     }
 
     public function update(Movie $movie)
@@ -95,12 +101,14 @@ class MovieController extends Controller
         ]);
 
         $movie->update($validated);
+
         return Redirect::route('admin.movies.index')->with('flash.banner', 'Movie Updated.');
     }
 
     public function destroy(Movie $movie)
     {
         $movie->delete();
+
         return Redirect::route('admin.movies.index')->with('flash.banner', 'Movie Deleted.')->with('flash.bannerStyle', 'danger');
     }
 }

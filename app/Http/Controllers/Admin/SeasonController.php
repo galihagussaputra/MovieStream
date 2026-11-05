@@ -6,7 +6,7 @@ use App\Http\Controllers\Admin\Concerns\HandlesAdminIndex;
 use App\Http\Controllers\Controller;
 use App\Models\Season;
 use App\Models\TvShow;
-use Illuminate\Support\Facades\Http;
+use App\Services\TmdbService;
 use Illuminate\Support\Facades\Redirect;
 use Illuminate\Support\Facades\Request;
 use Inertia\Inertia;
@@ -26,9 +26,9 @@ class SeasonController extends Controller
                     $query->where('name', 'like', "%{$search}%");
                 })
                 ->paginate($perPage),
-                // ->withQueryString(),
+            // ->withQueryString(),
             'filters' => Request::only(['search', 'perPage']),
-            'tvShow' => $tvShow
+            'tvShow' => $tvShow,
         ]);
     }
 
@@ -44,26 +44,27 @@ class SeasonController extends Controller
             return Redirect::back()->with('flash.banner', 'Season Exists.');
         }
 
-        $tmdb_season = Http::asJson()->get(config('services.tmdb.endpoint') . 'tv/' .$tvShow->tmdb_id . '/season/' . $seasonNumber . '?api_key=' . config('services.tmdb.secret') . '&language=en-US');
-        if ($tmdb_season->successful()) {
+        $tmdb_season = app(TmdbService::class)->season($tvShow->tmdb_id, $seasonNumber);
+        if ($tmdb_season) {
             Season::create([
                 'tv_show_id' => $tvShow->id,
                 'tmdb_id' => $tmdb_season['id'],
-                'name'    => $tmdb_season['name'],
+                'name' => $tmdb_season['name'],
                 'poster_path' => $tmdb_season['poster_path'],
-                'season_number' => $tmdb_season['season_number']
+                'season_number' => $tmdb_season['season_number'],
             ]);
+
             return Redirect::back()->with('flash.banner', 'Season created.');
         } else {
             return Redirect::back()->with('flash.banner', 'Api error.');
-        }      
+        }
     }
 
     public function edit(TvShow $tvShow, Season $season)
     {
         return Inertia::render('TvShows/Seasons/Edit', [
-            'tvShow' => $tvShow, 
-            'season' => $season
+            'tvShow' => $tvShow,
+            'season' => $season,
         ]);
     }
 
@@ -74,12 +75,14 @@ class SeasonController extends Controller
             'poster_path' => ['required', 'string', 'max:2048'],
         ]);
         $season->update($validated);
+
         return Redirect::route('admin.seasons.index', $tvShow->id)->with('flash.banner', 'Season updated.');
     }
 
     public function destroy(TvShow $tvShow, Season $season)
     {
         $season->delete();
+
         return Redirect::route('admin.seasons.index', $tvShow->id)->with('flash.banner', 'Season deleted.')->with('flash.bannerStyle', 'danger');
     }
 }

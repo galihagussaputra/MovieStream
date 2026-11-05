@@ -15,8 +15,12 @@ return [
     */
 
     'tmdb' => [
+        'token' => env('TMDB_TOKEN'),
         'secret' => env('TMDB_SECRET'),
-        'endpoint' => env('TMDB_ENDPOINT', 'https://api.themoviedb.org/3/')
+        'endpoint' => env('TMDB_ENDPOINT', 'https://api.themoviedb.org/3/'),
+        'image_url' => env('TMDB_IMAGE_URL', 'https://image.tmdb.org/t/p/'),
+        'language' => env('TMDB_LANGUAGE', 'en-US'),
+        'cache_ttl' => env('TMDB_CACHE_TTL', 600),
     ],
 
     'mailgun' => [

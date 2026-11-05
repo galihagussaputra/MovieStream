@@ -5,9 +5,9 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Admin\Concerns\HandlesAdminIndex;
 use App\Http\Controllers\Controller;
 use App\Models\Genre;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Request;
+use App\Services\TmdbService;
 use Illuminate\Support\Facades\Redirect;
+use Illuminate\Support\Facades\Request;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
@@ -25,33 +25,32 @@ class GenreController extends Controller
                     $query->where('title', 'like', "%{$search}%");
                 })
                 ->paginate($perPage),
-                // ->withQueryString(),
-            'filters' => Request::only(['search', 'perPage'])
+            // ->withQueryString(),
+            'filters' => Request::only(['search', 'perPage']),
         ]);
     }
 
     public function store()
     {
-        $tmdb_genres = Http::get(config('services.tmdb.endpoint') . 'genre/movie/list?api_key=' . config('services.tmdb.secret') . '&language=en-US');
-        if ($tmdb_genres->successful()) {
-            $tmdb_genres_json = $tmdb_genres->json();
-            foreach($tmdb_genres_json as $single_tmdb_genre){
-                foreach ($single_tmdb_genre as $tgenre){
-                    $genre = Genre::where('tmdb_id', $tgenre['id'])->first();
-                    if (!$genre) {
-                        Genre::create([
-                            'tmdb_id' => $tgenre['id'],
-                            'title' => $tgenre['name']
-                        ]);
-                    }
-                }
-            }
-            return Redirect::back()->with('flash.banner', 'genre created.');
+        $tmdb = app(TmdbService::class);
+        $genres = collect($tmdb->genres('movie'))
+            ->merge($tmdb->genres('tv'))
+            ->unique('id');
+
+        if ($genres->isEmpty()) {
+            return Redirect::back()->with('flash.banner', 'Api Error.');
         }
-        return Redirect::back()->with('flash.banner', 'Api Error.');
-        
+
+        foreach ($genres as $tmdbGenre) {
+            Genre::firstOrCreate(
+                ['tmdb_id' => $tmdbGenre['id']],
+                ['title' => $tmdbGenre['name']]
+            );
+        }
+
+        return Redirect::back()->with('flash.banner', 'genre created.');
     }
-    
+
     public function edit(Genre $genre)
     {
         return Inertia::render('Genres/Edit', ['genre' => $genre]);
@@ -67,12 +66,14 @@ class GenreController extends Controller
                 Rule::unique('genres', 'title')->ignore($genre),
             ],
         ]));
+
         return Redirect::route('admin.genres.index')->with('flash.banner', 'Genre updated.');
     }
 
     public function destroy(Genre $genre)
     {
         $genre->delete();
+
         return Redirect::route('admin.genres.index')->with('flash.banner', 'Genre deleted.')->with('flash.bannerStyle', 'danger');
     }
 }
