@@ -2,18 +2,21 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Http\Controllers\Admin\Concerns\HandlesAdminIndex;
 use App\Http\Controllers\Controller;
-// use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Redirect;
 use Inertia\Inertia;
 use App\Models\Tag;
 use Illuminate\Support\Facades\Request;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 class TagController extends Controller
 {
+    use HandlesAdminIndex;
+
     public function index(){
-        $perPage = Request::input('perPage') ?: 5;
+        $perPage = $this->perPage();
         return Inertia::render('Tags/Index', [
             'tags' => Tag::query()
                            ->when(Request::input('search'), function($query, $search) {
@@ -31,9 +34,13 @@ class TagController extends Controller
     }
     public function store()
     {
+        $validated = Request::validate([
+            'tagName' => ['required', 'string', 'max:255', Rule::unique('tags', 'tag_name')],
+        ]);
+
         Tag::create([
-            'tag_name' => Request::input('tagName'),
-            'slug' => Str::slug(Request::input('tagName'))
+            'tag_name' => $validated['tagName'],
+            'slug' => Str::slug($validated['tagName']),
         ]);
 
         return Redirect::route('admin.tags.index')->with('flash.banner', 'Tag Created.');
@@ -49,9 +56,18 @@ class TagController extends Controller
 
     public function update(Tag $tag)
     {
+        $validated = Request::validate([
+            'tagName' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('tags', 'tag_name')->ignore($tag),
+            ],
+        ]);
+
         $tag->update([
-            'tag_name' => Request::input('tagName'),
-            'slug' => Str::slug(Request::input('tagName'))
+            'tag_name' => $validated['tagName'],
+            'slug' => Str::slug($validated['tagName']),
         ]);
 
         return Redirect::route('admin.tags.index')->with('flash.banner', 'Tag updated.');

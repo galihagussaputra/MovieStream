@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Http\Controllers\Admin\Concerns\HandlesAdminIndex;
 use App\Http\Controllers\Controller;
 use App\Models\Episode;
 use App\Models\Season;
@@ -13,9 +14,11 @@ use Inertia\Inertia;
 
 class EpisodeController extends Controller
 {
+    use HandlesAdminIndex;
+
     public function index(TvShow $tvShow, Season $season)
     {
-        $perPage = Request::input('perPage') ?: 5;
+        $perPage = $this->perPage();
 
         return Inertia::render('TvShows/Seasons/Episodes/Index', [
             'episodes' => Episode::query()
@@ -33,11 +36,16 @@ class EpisodeController extends Controller
 
     public function store(TvShow $tvShow, Season $season)
     {
-        $episode = $season->episodes()->where('episode_number', Request::input('episodeNumber'))->exists();
+        $validated = Request::validate([
+            'episodeNumber' => ['required', 'integer', 'min:1', 'max:10000'],
+        ]);
+        $episodeNumber = $validated['episodeNumber'];
+
+        $episode = $season->episodes()->where('episode_number', $episodeNumber)->exists();
         if ($episode) {
             return Redirect::back()->with('flash.banner', 'Episode Exists.');
         }
-        $tmdb_episode = Http::asJson()->get(config('services.tmdb.endpoint') . 'tv/' . $tvShow->tmdb_id . '/season/' . $season->season_number . '/episode/'. Request::input('episodeNumber') . '?api_key=' . config('services.tmdb.secret') . '&language=en-US');
+        $tmdb_episode = Http::asJson()->get(config('services.tmdb.endpoint') . 'tv/' . $tvShow->tmdb_id . '/season/' . $season->season_number . '/episode/'. $episodeNumber . '?api_key=' . config('services.tmdb.secret') . '&language=en-US');
 
         if ($tmdb_episode->successful()) {
             Episode::create([
@@ -65,9 +73,9 @@ class EpisodeController extends Controller
     public function update(TvShow $tvShow, Season $season, Episode $episode)
     {
         $validated = Request::validate([
-            'name'    => 'required',
-            'overview' => 'required',
-            'is_public' => 'required'
+            'name' => ['required', 'string', 'max:255'],
+            'overview' => ['required', 'string', 'max:10000'],
+            'is_public' => ['required', 'boolean'],
         ]);
         $episode->update($validated);
         return Redirect::route('admin.episodes.index', [$tvShow->id, $season->id])->with('flash.banner', 'Episode updated.');

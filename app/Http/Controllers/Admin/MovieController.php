@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Http\Controllers\Admin\Concerns\HandlesAdminIndex;
 use App\Http\Controllers\Controller;
 use App\Models\Genre;
 use App\Models\Movie;
@@ -12,16 +13,20 @@ use Inertia\Inertia;
 
 class MovieController extends Controller
 {
+    use HandlesAdminIndex;
+
     public function index()
     {
-        $perPage = Request::input('perPage') ?: 5;
+        $perPage = $this->perPage();
+        $column = $this->sortColumn(['title', 'rating', 'visits']);
+        $direction = $this->sortDirection();
 
         return Inertia::render('Movies/Index', [
             'movies' => Movie::query()
                 ->when(Request::input('search'), function ($query, $search) {
                     $query->where('title', 'like', "%{$search}%");
-                })->when(Request::has('column'), function($query){
-                    $query->orderBy(Request::input('column'), Request::input('direction'));
+                })->when($column, function ($query) use ($column, $direction) {
+                    $query->orderBy($column, $direction);
                 })
                 ->paginate($perPage),
                 // ->withQueryString(),
@@ -31,12 +36,17 @@ class MovieController extends Controller
 
     public function store()
     {
-        $movie = Movie::where('tmdb_id', Request::input('movieTMDBId'))->exists();
+        $validated = Request::validate([
+            'movieTMDBId' => ['required', 'integer', 'min:1', 'max:2147483647'],
+        ]);
+        $movieTMDBId = $validated['movieTMDBId'];
+
+        $movie = Movie::where('tmdb_id', $movieTMDBId)->exists();
         if ($movie) {
             return Redirect::back()->with('flash.banner', 'Movie Exists.');
         }
 
-        $apiMovie = Http::asJson()->get(config('services.tmdb.endpoint').'movie/'. Request::input('movieTMDBId'). '?api_key=' . config('services.tmdb.secret') . '&language=en-US');
+        $apiMovie = Http::asJson()->get(config('services.tmdb.endpoint').'movie/'. $movieTMDBId . '?api_key=' . config('services.tmdb.secret') . '&language=en-US');
 
         if ($apiMovie->successful()) {
 
@@ -73,15 +83,15 @@ class MovieController extends Controller
     public function update(Movie $movie)
     {
         $validated = Request::validate([
-            'title' => 'required',
-            'poster_path' => 'required',
-            'runtime' => 'required',
-            'lang' => 'required',
-            'video_format' => 'required',
-            'rating' => 'required',
-            'backdrop_path' => 'required',
-            'overview' => 'required',
-            'is_public' => 'required'
+            'title' => ['required', 'string', 'max:255'],
+            'poster_path' => ['required', 'string', 'max:2048'],
+            'runtime' => ['required', 'integer', 'min:1', 'max:1000'],
+            'lang' => ['required', 'string', 'max:16'],
+            'video_format' => ['required', 'string', 'max:50'],
+            'rating' => ['required', 'numeric', 'between:0,10'],
+            'backdrop_path' => ['required', 'string', 'max:2048'],
+            'overview' => ['required', 'string', 'max:10000'],
+            'is_public' => ['required', 'boolean'],
         ]);
 
         $movie->update($validated);

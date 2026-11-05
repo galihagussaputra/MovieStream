@@ -2,18 +2,22 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Http\Controllers\Admin\Concerns\HandlesAdminIndex;
 use App\Http\Controllers\Controller;
 use App\Models\Genre;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Request;
 use Illuminate\Support\Facades\Redirect;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class GenreController extends Controller
 {
+    use HandlesAdminIndex;
+
     public function index()
     {
-        $perPage = Request::input('perPage') ?: 5;
+        $perPage = $this->perPage();
 
         return Inertia::render('Genres/Index', [
             'genres' => Genre::query()
@@ -56,7 +60,12 @@ class GenreController extends Controller
     public function update(Genre $genre)
     {
         $genre->update(Request::validate([
-            'title' => 'required'
+            'title' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('genres', 'title')->ignore($genre),
+            ],
         ]));
         return Redirect::route('admin.genres.index')->with('flash.banner', 'Genre updated.');
     }

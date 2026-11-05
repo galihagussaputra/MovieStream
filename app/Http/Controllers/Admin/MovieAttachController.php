@@ -31,8 +31,8 @@ class MovieAttachController extends Controller
     public function addTrailer(Movie $movie)
     {
         $movie->trailers()->create(Request::validate([
-            'name'    => 'required',
-            'embed_html' => 'required'
+            'name' => ['required', 'string', 'max:255'],
+            'embed_html' => ['required', 'string', 'max:10000', 'not_regex:/<\s*script\b/i'],
         ]));
         return Redirect::back()->with('flash.banner', 'Trailer Added.');
     }
@@ -40,8 +40,8 @@ class MovieAttachController extends Controller
     public function addDownload(Movie $movie)
     {
         $movie->downloads()->create(Request::validate([
-            'name'    => 'required',
-            'web_url' => 'required'
+            'name' => ['required', 'string', 'max:255'],
+            'web_url' => ['required', 'url:http,https', 'max:2048'],
         ]));
         return Redirect::back()->with('flash.banner', 'Download Added.');
     }
@@ -60,16 +60,20 @@ class MovieAttachController extends Controller
 
     public function addCast(Movie $movie)
     {
-        $casts = Request::input('casts');
-        $cast_ids = collect($casts)->pluck('id');
-        $movie->casts()->sync($cast_ids);
-        return Redirect::back()->with('flash.banner', 'Csats attached.');
+        $validated = Request::validate([
+            'casts' => ['present', 'array'],
+            'casts.*.id' => ['required', 'integer', 'exists:casts,id'],
+        ]);
+        $movie->casts()->sync(collect($validated['casts'])->pluck('id'));
+        return Redirect::back()->with('flash.banner', 'Casts attached.');
     }
     public function addTag(Movie $movie)
     {
-        $tags = Request::input('tags');
-        $tag_ids = collect($tags)->pluck('id');
-        $movie->tags()->sync($tag_ids);
+        $validated = Request::validate([
+            'tags' => ['present', 'array'],
+            'tags.*.id' => ['required', 'integer', 'exists:tags,id'],
+        ]);
+        $movie->tags()->sync(collect($validated['tags'])->pluck('id'));
         return Redirect::back()->with('flash.banner', 'Tags attached.');
     }
 }

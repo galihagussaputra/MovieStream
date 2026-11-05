@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Http\Controllers\Admin\Concerns\HandlesAdminIndex;
 use App\Http\Controllers\Controller;
 use App\Models\TvShow;
 use Illuminate\Support\Facades\Http;
@@ -11,9 +12,11 @@ use Inertia\Inertia;
 
 class TvShowController extends Controller
 {
+    use HandlesAdminIndex;
+
     public function index()
     {
-        $perPage = Request::input('perPage') ?: 5;
+        $perPage = $this->perPage();
 
         return Inertia::render('TvShows/Index', [
             'tvShows' => TvShow::query()
@@ -28,12 +31,17 @@ class TvShowController extends Controller
 
     public function store()
     {
-        $tvShow = TvShow::where('tmdb_id', Request::input('tvShowTMDBId'))->first();
+        $validated = Request::validate([
+            'tvShowTMDBId' => ['required', 'integer', 'min:1', 'max:2147483647'],
+        ]);
+        $tvShowTMDBId = $validated['tvShowTMDBId'];
+
+        $tvShow = TvShow::where('tmdb_id', $tvShowTMDBId)->first();
         if ($tvShow) {
             return Redirect::back()->with('flash.banner', 'Tv Show Exists.');
         }
 
-        $tmdb_tv = Http::asJson()->get(config('services.tmdb.endpoint') . 'tv/' . Request::input('tvShowTMDBId') . '?api_key=' . config('services.tmdb.secret') . '&language=en-US');
+        $tmdb_tv = Http::asJson()->get(config('services.tmdb.endpoint') . 'tv/' . $tvShowTMDBId . '?api_key=' . config('services.tmdb.secret') . '&language=en-US');
         if ($tmdb_tv->successful()) {
             TvShow::create([
                 'tmdb_id' => $tmdb_tv['id'],
@@ -55,8 +63,8 @@ class TvShowController extends Controller
     public function update(TvShow $tvShow)
     {
         $validated = Request::validate([
-            'name'    => 'required',
-            'poster_path' => 'required'
+            'name' => ['required', 'string', 'max:255'],
+            'poster_path' => ['required', 'string', 'max:2048'],
         ]);
         $tvShow->update($validated);
         return Redirect::route('admin.tv-shows.index')->with('flash.banner', 'Tv Show updated.');
